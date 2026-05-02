@@ -163,6 +163,8 @@ python run_dashboard.py
 
 **Procfile** apunta a `python run_web.py` y `python run_dashboard.py` (lee `PORT` desde el entorno; en local sin `PORT` usa 8000 y 8501). En Railway cada servicio puede usar ese comando o el equivalente en el builder.
 
+Si el **Start Command** en Railway sigue siendo `uvicorn ... --port $PORT` o `streamlit ... $PORT`, en algunos entornos `$PORT` no se expande y ves errores con el texto literal `'$PORT'`. Solución: usar solo `python run_web.py` / `python run_dashboard.py`. No definas variables `PORT` ni `STREAMLIT_SERVER_PORT` con el valor textual `$PORT`; Railway asigna `PORT` numérico solo si no lo pisás mal.
+
 ## Conectar Twilio (WhatsApp)
 
 1. En la consola Twilio, abrí tu número / sandbox de WhatsApp.
@@ -194,6 +196,7 @@ Usá `https://xxxx.ngrok-free.app/webhook` como webhook temporal.
 - `dashboard.py` — Streamlit.
 - `Procfile` — Arranque `web` / `dashboard` vía `run_web.py` y `run_dashboard.py`.
 - `run_web.py`, `run_dashboard.py` — Puerto desde `PORT` (Railway) o valores por defecto locales.
+- `port_util.py` — Parseo seguro de `PORT` (ignora `$PORT` sin expandir, vacíos, etc.).
 - `Dockerfile` — Imagen Python con dependencias.
 - `docker-compose.yml` — Postgres + `web` + `dashboard` para desarrollo local.
 - `.env.example` — Plantilla para `GEMINI_API_KEY` (usada con Compose).
