@@ -10,6 +10,8 @@ from fastapi.responses import PlainTextResponse
 from ai import apply_cuotas_override, extract_expense, to_decimal_amount
 from crud import create_expense
 from db import SessionLocal, init_db
+from fastapi import Request
+import requests
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -80,9 +82,68 @@ async def twilio_webhook(
         )
 
 
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+
+
+async def _send_telegram_message(chat_id: int, text: str):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    try:
+        requests.post(url, json={
+            "chat_id": chat_id,
+            "text": text
+        })
+    except Exception as e:
+        logger.exception("Error enviando mensaje a Telegram: %s", e)
+
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    data = await request.json()
+
+    try:
+        message = data.get("message", {})
+        text = (message.get("text") or "").strip()
+        chat_id = message.get("chat", {}).get("id")
+
+        if not text or not chat_id:
+            return {"ok": True}
+
+        parsed = extract_expense(text)
+        category = apply_cuotas_override(text, parsed["category"])
+        expense_date = date.fromisoformat(parsed["date"])
+        amount_dec = to_decimal_amount(parsed["amount"])
+
+        db = SessionLocal()
+        try:
+            create_expense(
+                db,
+                amount=amount_dec,
+                category=category,
+                description=parsed["description"],
+                expense_date=expense_date,
+            )
+        finally:
+            db.close()
+
+        msg = f"Guardado: ${float(amount_dec)} en {category}"
+
+        await _send_telegram_message(chat_id, msg)
+
+        return {"ok": True}
+
+    except Exception as e:
+        logger.exception("Error procesando Telegram: %s", e)
+
+        if "chat_id" in locals():
+            await _send_telegram_message(chat_id, "No entendí el gasto")
+
+        return {"ok": True}
+
+
 @app.get("/")
 def root():
     return Response(content="POST /webhook para Twilio", media_type="text/plain")
+
 
 
 def _listen_port(default: int = 8000) -> int:
