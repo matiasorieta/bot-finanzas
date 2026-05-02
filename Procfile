@@ -1,2 +1,2 @@
-web: uvicorn main:app --host 0.0.0.0 --port $PORT
-dashboard: streamlit run dashboard.py --server.port $PORT --server.address 0.0.0.0
+web: python run_web.py
+dashboard: python run_dashboard.py

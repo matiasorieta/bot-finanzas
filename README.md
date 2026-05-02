@@ -141,10 +141,10 @@ El mismo repositorio puede desplegarse **dos veces** como servicios independient
 
 - **New** → **GitHub Repo** (o deploy desde CLI) con este proyecto.
 - **Variables**: `DATABASE_URL` (la misma que la DB), `GEMINI_API_KEY`.
-- **Start command** (si no tomás el proceso por defecto del Procfile):
+- **Start command** (si no tomás el proceso por defecto del Procfile). Railway define la variable `PORT`; estos scripts la leen y evitan el error de `$PORT` sin expandir en Windows:
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port $PORT
+python run_web.py
 ```
 
 - Asigná un dominio público y usá la URL base para Twilio (ver más abajo).
@@ -156,12 +156,12 @@ uvicorn main:app --host 0.0.0.0 --port $PORT
 - **Start command**:
 
 ```bash
-streamlit run dashboard.py --server.port $PORT --server.address 0.0.0.0
+python run_dashboard.py
 ```
 
 - Generá dominio público para abrir el dashboard en el navegador.
 
-**Procfile** incluye ambas líneas (`web` y `dashboard`); en Railway cada servicio debe tener configurado **un** comando de arranque explícito según el rol (API vs Streamlit).
+**Procfile** apunta a `python run_web.py` y `python run_dashboard.py` (lee `PORT` desde el entorno; en local sin `PORT` usa 8000 y 8501). En Railway cada servicio puede usar ese comando o el equivalente en el builder.
 
 ## Conectar Twilio (WhatsApp)
 
@@ -192,7 +192,8 @@ Usá `https://xxxx.ngrok-free.app/webhook` como webhook temporal.
 - `models.py` — Modelo `Expense`.
 - `crud.py` — Altas y consultas (`get_expenses`, `get_expenses_by_date_range`, `get_summary_by_category`, `get_daily_spending`).
 - `dashboard.py` — Streamlit.
-- `Procfile` — Comandos de referencia para `web` y `dashboard`.
+- `Procfile` — Arranque `web` / `dashboard` vía `run_web.py` y `run_dashboard.py`.
+- `run_web.py`, `run_dashboard.py` — Puerto desde `PORT` (Railway) o valores por defecto locales.
 - `Dockerfile` — Imagen Python con dependencias.
 - `docker-compose.yml` — Postgres + `web` + `dashboard` para desarrollo local.
 - `.env.example` — Plantilla para `GEMINI_API_KEY` (usada con Compose).
