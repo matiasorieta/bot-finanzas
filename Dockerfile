@@ -13,4 +13,4 @@ COPY . .
 
 EXPOSE 8000 8501
 
-CMD ["python", "run_web.py"]
+CMD ["python", "main.py"]

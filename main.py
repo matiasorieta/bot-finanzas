@@ -83,3 +83,20 @@ async def twilio_webhook(
 @app.get("/")
 def root():
     return Response(content="POST /webhook para Twilio", media_type="text/plain")
+
+
+def _listen_port(default: int = 8000) -> int:
+    raw = (os.environ.get("PORT") or "").strip()
+    if not raw or raw.startswith("$"):
+        return default
+    try:
+        n = int(raw)
+        return n if 1 <= n <= 65535 else default
+    except ValueError:
+        return default
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=_listen_port(8000))

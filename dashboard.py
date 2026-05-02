@@ -1,9 +1,31 @@
 import os
-from datetime import date
 from calendar import monthrange
+from datetime import date
 
-import pandas as pd
-import streamlit as st
+
+def _prepare_streamlit_port(default: str = "8501") -> None:
+    """Evita STREAMLIT_SERVER_PORT / PORT inválidos (p. ej. el literal '$PORT')."""
+
+    def ok(s: str) -> bool:
+        if not s or s.startswith("$"):
+            return False
+        try:
+            n = int(s)
+            return 1 <= n <= 65535
+        except ValueError:
+            return False
+
+    if not ok((os.environ.get("STREAMLIT_SERVER_PORT") or "").strip()):
+        os.environ.pop("STREAMLIT_SERVER_PORT", None)
+
+    port = (os.environ.get("PORT") or "").strip()
+    os.environ["STREAMLIT_SERVER_PORT"] = port if ok(port) else default
+
+
+_prepare_streamlit_port()
+
+import pandas as pd  # noqa: E402
+import streamlit as st  # noqa: E402
 
 from crud import (
     get_daily_spending,

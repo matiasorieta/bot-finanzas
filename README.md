@@ -34,16 +34,22 @@ $env:DATABASE_URL = "postgresql://usuario:password@localhost:5432/finanzas"
 $env:GEMINI_API_KEY = "tu_clave"
 ```
 
-3. API (webhook):
+3. API (webhook) — cualquiera de estas dos:
 
 ```bash
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+```bash
+python main.py
+```
+
+(`python main.py` usa la variable `PORT` si es un entero válido; si no, 8000.)
+
 4. Dashboard:
 
 ```bash
-streamlit run dashboard.py
+streamlit run dashboard.py --server.address 0.0.0.0
 ```
 
 La tabla `expenses` se crea automáticamente al levantar la API (si `DATABASE_URL` está definida).
@@ -89,7 +95,7 @@ docker compose up --build postgres web
 docker compose up --build postgres dashboard
 ```
 
-Imagen de producción (sin volúmenes): construí con el `Dockerfile` y pasá `DATABASE_URL` / `GEMINI_API_KEY` en runtime; el `CMD` por defecto es la API.
+Imagen de producción (sin volúmenes): construí con el `Dockerfile` y pasá `DATABASE_URL` / `GEMINI_API_KEY` en runtime; el `CMD` por defecto es `python main.py`.
 
 ## Cómo testear los mensajes (sin WhatsApp)
 
@@ -132,6 +138,8 @@ Necesitás **`GEMINI_API_KEY`** válida y **`DATABASE_URL`** apuntando a una Pos
 
 El mismo repositorio puede desplegarse **dos veces** como servicios independientes que comparten la misma base de datos.
 
+Railway (Nixpacks) a veces propone un comando con `--port $PORT` donde `$PORT` no se expande y falla. La forma estable es **definir el Start Command a mano** (sin `$PORT` en el texto del comando; Railway igual inyecta la variable `PORT` numérica en el entorno):
+
 ### 1) Base de datos
 
 - En Railway: **New** → **Database** → **PostgreSQL**.
@@ -140,30 +148,36 @@ El mismo repositorio puede desplegarse **dos veces** como servicios independient
 ### 2) Servicio **backend** (webhook)
 
 - **New** → **GitHub Repo** (o deploy desde CLI) con este proyecto.
-- **Variables**: `DATABASE_URL` (la misma que la DB), `GEMINI_API_KEY`.
-- **Start command** (si no tomás el proceso por defecto del Procfile). Railway define la variable `PORT`; estos scripts la leen y evitan el error de `$PORT` sin expandir en Windows:
+- **Variables**: `DATABASE_URL`, `GEMINI_API_KEY`.
+- **Settings → Deploy → Custom Start Command**:
 
 ```bash
-python run_web.py
+python main.py
 ```
+
+`main.py` lee `PORT` desde el entorno (ignora valores basura tipo `$PORT`).
 
 - Asigná un dominio público y usá la URL base para Twilio (ver más abajo).
 
 ### 3) Servicio **dashboard** (Streamlit)
 
 - **New** → **Empty service** o segundo deploy del mismo repo.
-- **Variables**: solo `DATABASE_URL` (misma que la DB). No hace falta `GEMINI_API_KEY` en el dashboard.
-- **Start command**:
+- **Variables**: `DATABASE_URL`. No hace falta `GEMINI_API_KEY`.
+- **Custom Start Command**:
 
 ```bash
-python run_dashboard.py
+streamlit run dashboard.py --server.address 0.0.0.0
 ```
 
-- Generá dominio público para abrir el dashboard en el navegador.
+Al inicio, `dashboard.py` copia un `PORT` válido a `STREAMLIT_SERVER_PORT` o usa 8501.
 
-**Procfile** apunta a `python run_web.py` y `python run_dashboard.py` (lee `PORT` desde el entorno; en local sin `PORT` usa 8000 y 8501). En Railway cada servicio puede usar ese comando o el equivalente en el builder.
+- Generá dominio público para el dashboard.
 
-Si el **Start Command** en Railway sigue siendo `uvicorn ... --port $PORT` o `streamlit ... $PORT`, en algunos entornos `$PORT` no se expande y ves errores con el texto literal `'$PORT'`. Solución: usar solo `python run_web.py` / `python run_dashboard.py`. No definas variables `PORT` ni `STREAMLIT_SERVER_PORT` con el valor textual `$PORT`; Railway asigna `PORT` numérico solo si no lo pisás mal.
+No agregues variables `PORT` ni `STREAMLIT_SERVER_PORT` con el texto `$PORT`. Si existían, borralas.
+
+**Dockerfile**: `CMD` por defecto `python main.py` (API). Para desplegar solo el dashboard con esta imagen, sobreescribí el comando en Railway con el de Streamlit de arriba.
+
+**Procfile**: referencia para otros hosts (`web` / `dashboard`).
 
 ## Conectar Twilio (WhatsApp)
 
@@ -193,11 +207,9 @@ Usá `https://xxxx.ngrok-free.app/webhook` como webhook temporal.
 - `db.py` — Motor SQLAlchemy y creación de tablas.
 - `models.py` — Modelo `Expense`.
 - `crud.py` — Altas y consultas (`get_expenses`, `get_expenses_by_date_range`, `get_summary_by_category`, `get_daily_spending`).
-- `dashboard.py` — Streamlit.
-- `Procfile` — Arranque `web` / `dashboard` vía `run_web.py` y `run_dashboard.py`.
-- `run_web.py`, `run_dashboard.py` — Puerto desde `PORT` (Railway) o valores por defecto locales.
-- `port_util.py` — Parseo seguro de `PORT` (ignora `$PORT` sin expandir, vacíos, etc.).
-- `Dockerfile` — Imagen Python con dependencias.
+- `dashboard.py` — Streamlit (normaliza puerto antes de cargar Streamlit).
+- `Procfile` — `python main.py` / `streamlit run …`.
+- `Dockerfile` — Imagen Python; arranque API con `python main.py`.
 - `docker-compose.yml` — Postgres + `web` + `dashboard` para desarrollo local.
 - `.env.example` — Plantilla para `GEMINI_API_KEY` (usada con Compose).
 

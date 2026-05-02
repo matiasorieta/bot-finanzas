@@ -1,2 +1,2 @@
-web: python run_web.py
-dashboard: python run_dashboard.py
+web: python main.py
+dashboard: streamlit run dashboard.py --server.address 0.0.0.0
