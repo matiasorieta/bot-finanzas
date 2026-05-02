@@ -49,8 +49,10 @@ python main.py
 4. Dashboard:
 
 ```bash
-streamlit run dashboard.py --server.address 0.0.0.0
+python run_dashboard.py
 ```
+
+(o `streamlit run dashboard.py --server.address 0.0.0.0 --server.port 8501` en local si preferís).
 
 La tabla `expenses` se crea automáticamente al levantar la API (si `DATABASE_URL` está definida).
 
@@ -138,7 +140,9 @@ Necesitás **`GEMINI_API_KEY`** válida y **`DATABASE_URL`** apuntando a una Pos
 
 El mismo repositorio puede desplegarse **dos veces** como servicios independientes que comparten la misma base de datos.
 
-Railway (Nixpacks) a veces propone un comando con `--port $PORT` donde `$PORT` no se expande y falla. La forma estable es **definir el Start Command a mano** (sin `$PORT` en el texto del comando; Railway igual inyecta la variable `PORT` numérica en el entorno):
+Nixpacks suele arrancar `uvicorn … --port $PORT` y Streamlit con `STREAMLIT_SERVER_PORT='$PORT'` **antes** de ejecutar tu código, por eso falla aunque `main.py` / `dashboard.py` corrijan el puerto después.
+
+Este repo trae **`nixpacks.toml`** para que el arranque por defecto sea **`python main.py`** (sin CLI de uvicorn). El servicio **dashboard** debe usar **`python run_dashboard.py`**: ese script limpia el entorno y recién ahí lanza Streamlit.
 
 ### 1) Base de datos
 
@@ -149,13 +153,11 @@ Railway (Nixpacks) a veces propone un comando con `--port $PORT` donde `$PORT` n
 
 - **New** → **GitHub Repo** (o deploy desde CLI) con este proyecto.
 - **Variables**: `DATABASE_URL`, `GEMINI_API_KEY`.
-- **Settings → Deploy → Custom Start Command**:
+- **Custom Start Command**: dejalo **vacío** (aplica `nixpacks.toml` → `python main.py`) o explícito:
 
 ```bash
 python main.py
 ```
-
-`main.py` lee `PORT` desde el entorno (ignora valores basura tipo `$PORT`).
 
 - Asigná un dominio público y usá la URL base para Twilio (ver más abajo).
 
@@ -163,21 +165,19 @@ python main.py
 
 - **New** → **Empty service** o segundo deploy del mismo repo.
 - **Variables**: `DATABASE_URL`. No hace falta `GEMINI_API_KEY`.
-- **Custom Start Command**:
+- **Custom Start Command** (obligatorio; si no, este servicio usaría `python main.py` del `nixpacks.toml`):
 
 ```bash
-streamlit run dashboard.py --server.address 0.0.0.0
+python run_dashboard.py
 ```
-
-Al inicio, `dashboard.py` copia un `PORT` válido a `STREAMLIT_SERVER_PORT` o usa 8501.
 
 - Generá dominio público para el dashboard.
 
-No agregues variables `PORT` ni `STREAMLIT_SERVER_PORT` con el texto `$PORT`. Si existían, borralas.
+Borrá variables **`STREAMLIT_SERVER_PORT`** o **`PORT`** si las definiste a mano con el texto **`$PORT`**. Railway asigna `PORT` numérico solo si no la pisás.
 
-**Dockerfile**: `CMD` por defecto `python main.py` (API). Para desplegar solo el dashboard con esta imagen, sobreescribí el comando en Railway con el de Streamlit de arriba.
+**Dockerfile**: `CMD` por defecto `python main.py` (API). En el servicio dashboard, sobreescribí el comando a `python run_dashboard.py`.
 
-**Procfile**: referencia para otros hosts (`web` / `dashboard`).
+**Procfile**: `python main.py` / `python run_dashboard.py`.
 
 ## Conectar Twilio (WhatsApp)
 
@@ -207,8 +207,10 @@ Usá `https://xxxx.ngrok-free.app/webhook` como webhook temporal.
 - `db.py` — Motor SQLAlchemy y creación de tablas.
 - `models.py` — Modelo `Expense`.
 - `crud.py` — Altas y consultas (`get_expenses`, `get_expenses_by_date_range`, `get_summary_by_category`, `get_daily_spending`).
-- `dashboard.py` — Streamlit (normaliza puerto antes de cargar Streamlit).
-- `Procfile` — `python main.py` / `streamlit run …`.
+- `dashboard.py` — App Streamlit.
+- `run_dashboard.py` — Entrada recomendada para Streamlit en prod (sanea `PORT` / `STREAMLIT_SERVER_PORT` antes de lanzar Streamlit).
+- `nixpacks.toml` — Arranque por defecto `python main.py` (servicio API en Railway).
+- `Procfile` — `python main.py` / `python run_dashboard.py`.
 - `Dockerfile` — Imagen Python; arranque API con `python main.py`.
 - `docker-compose.yml` — Postgres + `web` + `dashboard` para desarrollo local.
 - `.env.example` — Plantilla para `GEMINI_API_KEY` (usada con Compose).

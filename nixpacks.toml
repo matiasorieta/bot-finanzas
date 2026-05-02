@@ -1,0 +1,4 @@
+# Evita el comando auto de Nixpacks: uvicorn main:app --port $PORT (a veces $PORT llega literal).
+# Servicio dashboard en Railway: definí Start Command "python run_dashboard.py" (este archivo no aplica por servicio).
+[start]
+cmd = "python main.py"
